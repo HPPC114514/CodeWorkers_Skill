@@ -1,0 +1,6 @@
+interface:
+  display_name: "Code Workers"
+  short_description: "Plan coding tasks and coordinate lower-cost workers"
+  default_prompt: "Use $code-workers to plan this change and delegate bounded implementation tasks to my configured worker."
+policy:
+  allow_implicit_invocation: true
