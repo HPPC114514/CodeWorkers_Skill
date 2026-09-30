@@ -1,21 +1,30 @@
 # Code Workers
 
-当前主会话负责规划、技术决策和验收，明确选定的低成本 worker 完成有边界的实现任务。支持 Codex、Claude Code、Antigravity、OpenCode、Pi、DeepSeek Harness（DSH）、ZCode；其他 harness 使用通用规则。
+Code Workers 是一个可移植的 coding skill：主会话负责需求、技术决策、任务拆分和验收，把范围明确的实现工作交给**显式选定模型**的 worker。它提供任务交接规则、七个平台的适配说明，以及离线生成和安装 worker 定义的命令行工具。
 
-可分发内容是整个 [`skills/code-workers`](skills/code-workers) 目录。运行时不依赖 Superpowers，不需要安装 npm 包；脚本需要 **Node.js 20+**。主模型由你选择。skill 不切换主模型、不默认让 worker 继承主模型、不自动升级模型，也不另设 reviewer 模型层。
+支持 Codex、Claude Code、Antigravity、OpenCode、Pi、DeepSeek Harness（DSH）和 ZCode；其他 harness 可生成通用交接提示词。主模型由你选择，skill 不切换主模型、不默认让 worker 继承主模型、不自动升级模型，也不另设 reviewer 模型层。
 
-## 开始使用
+**要求：**使用脚本需要 Node.js 20+；分发和运行 skill 不需要安装 npm 包，也不依赖 Superpowers。平台必须实际提供委派、模型选择和结果回收能力；安装持久 worker 定义还需要该平台支持对应格式。仅生成模板不能证明模型可用或客户端已加载它。
 
-1. 将整个 `skills/code-workers` 文件夹放到当前 harness 实际支持的 skill 目录，保留内部结构。[Codex 当前文档](https://learn.chatgpt.com/docs/build-skills)使用用户级 `~/.agents/skills/code-workers/` 或项目级 `.agents/skills/code-workers/`；其他客户端按其已安装版本的导入方式操作。无法确认路径时不要猜测，可以先让主会话读取绝对路径下的 `SKILL.md`。
-2. 调用 `code-workers`，或描述“规划后将实现任务交给低成本 worker”。支持按描述发现技能的平台可自动选择它；Codex 元数据允许自动发现。
-3. 首次明确选择 worker 模型及兼容推理强度。主 agent 只读取当前平台的适配说明，核实调度工具、模型、安装位置与已有定义，再配置模板。后续复用已验证的选择。
-4. 主 agent 解决关键决策后派发任务，独立且修改范围不重叠的任务可以并行。worker 返回 `complete | partial | blocked`；主 agent 检查真实修改和验证证据后验收。CI-only 禁止本地测试，排队中的 CI 不算通过。
+## 快速开始
+
+1. **放置 skill。**复制整个 [`skills/code-workers`](skills/code-workers) 目录，并保留内部结构。按 [Codex 官方文档](https://learn.chatgpt.com/docs/build-skills)，用户级目录是 `~/.agents/skills/code-workers/`，项目级目录是 `.agents/skills/code-workers/`；其他客户端按其实际支持的导入方式操作。无法确认路径时，可先让主会话读取绝对路径下的 `SKILL.md`。
+2. **选择 worker。**调用 `code-workers`，或提出“规划后将实现任务交给低成本 worker”。首次使用时明确选择 worker 模型及兼容的推理强度。主会话先读取当前平台的适配说明，核实调度工具、模型权限、安装位置与已有定义；后续复用已验证的选择。
+3. **交付任务。**主会话确定接口、修改范围、验收条件和允许的验证方式后，按[任务包](skills/code-workers/references/task-packet.md)派发。修改范围重叠的任务串行执行；worker 返回 `complete | partial | blocked` 后，主会话检查实际改动和验证证据。若用户要求仅在 CI 中测试，就不运行本地测试，排队中的 CI 也不算通过。
+
+若只想先看生成结果，可在仓库根目录运行一个**离线预览**：
+
+```sh
+node skills/code-workers/scripts/worker.mjs render --harness codex --model gpt-6-luna --effort medium
+```
+
+此命令将模板打印到标准输出，不修改个人配置，也不会调用模型。示例模型只展示参数格式；使用前仍须确认账户支持。要安装 worker 定义，请继续阅读下文的预检和回滚说明。
 
 示例请求：
 
 > 使用 code-workers。当前会话负责规划和验收，worker 使用我选定的低成本模型。先确认当前平台的原生子 agent 能力与模型路由，再安装或复用模板。不要升级模型。只允许在 CI 中运行测试。
 
-skill 的发现与 worker 定义的安装是两件事：下列脚本只管理 worker 定义，不会自动把 skill 安装到多个客户端。
+skill 的发现与 worker 定义的安装是两件事：下列脚本只管理 worker 定义，不会自动把 skill 安装到客户端的 skill 目录。
 
 ## 平台支持
 
@@ -76,6 +85,8 @@ DSH 只接受已初始化的现有 profile。用 `render --merge-profile` 预览
 
 ## 开发与验证
 
+仓库中的 [`SKILL.md`](skills/code-workers/SKILL.md) 是使用入口；[`references`](skills/code-workers/references) 存放平台适配和安装说明；[`worker-prompt.md`](skills/code-workers/assets/worker-prompt.md) 是各模板共用的 worker 指令；[`worker.mjs`](skills/code-workers/scripts/worker.mjs) 实现命令行工具。根目录的 [`code-worker-system-prompt.md`](code-worker-system-prompt.md) 保留原始提示词，验证范围与结果见 [`docs/validation.md`](docs/validation.md)。
+
 ```sh
 npm ci --ignore-scripts
 npm test
@@ -84,3 +95,7 @@ npm test
 只有测试需要 YAML/TOML 解析器，分发 skill 无需 `node_modules`。测试覆盖七类格式、完整提示词、中文和路径转义、能力与模型检查、安装冲突、幂等、异常恢复及并发保护。相同场景的无 skill 基线与加载 skill 后结果见 [`docs/validation.md`](docs/validation.md)。
 
 真实调度验证限于当前 Codex 已有 `code_worker` 角色。其他平台通过格式及场景验证，尚未完成各自客户端中的运行验证。生成模板不能视为运行通过，也不构成量化成本节约结论。
+
+## 许可
+
+本仓库采用 [Mozilla Public License 2.0](LICENSE)。
